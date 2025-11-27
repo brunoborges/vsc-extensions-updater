@@ -10,6 +10,13 @@ on:
     # Run weekly on Sundays at 02:00 UTC to catch dependency issues
     - cron: '0 2 * * 0'
 
+# Permissions needed for test reporting
+permissions:
+  contents: read
+  checks: write
+  pull-requests: write
+  actions: read
+
 env:
   MAVEN_OPTS: "-Dmaven.repo.local=.m2/repository -Dorg.slf4j.simpleLogger.log.org.apache.maven.cli.transfer.Slf4jMavenTransferListener=WARN -Dorg.slf4j.simpleLogger.showDateTime=true -Djava.awt.headless=true"
 
@@ -53,12 +60,47 @@ jobs:
       
     - name: Generate test report
       if: always()
-      uses: dorny/test-reporter@v1
-      with:
-        name: Test Results (${{ matrix.display-name }} - Java ${{ matrix.java }})
-        path: target/surefire-reports/*.xml
-        reporter: java-junit
-        fail-on-error: false
+      run: |
+        echo "## Test Results for ${{ matrix.display-name }} - Java ${{ matrix.java }}" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        
+        if [ -d "target/surefire-reports" ] && [ "$(ls -A target/surefire-reports/*.xml 2>/dev/null)" ]; then
+          # Parse test results from XML
+          TOTAL_TESTS=$(grep -r "tests=" target/surefire-reports/TEST-*.xml | head -1 | sed 's/.*tests="\([0-9]*\)".*/\1/')
+          FAILED_TESTS=$(grep -r "failures=" target/surefire-reports/TEST-*.xml | head -1 | sed 's/.*failures="\([0-9]*\)".*/\1/')
+          ERROR_TESTS=$(grep -r "errors=" target/surefire-reports/TEST-*.xml | head -1 | sed 's/.*errors="\([0-9]*\)".*/\1/')
+          SKIPPED_TESTS=$(grep -r "skipped=" target/surefire-reports/TEST-*.xml | head -1 | sed 's/.*skipped="\([0-9]*\)".*/\1/')
+          
+          # Default to 0 if parsing fails
+          TOTAL_TESTS=${TOTAL_TESTS:-0}
+          FAILED_TESTS=${FAILED_TESTS:-0}
+          ERROR_TESTS=${ERROR_TESTS:-0}
+          SKIPPED_TESTS=${SKIPPED_TESTS:-0}
+          
+          PASSED_TESTS=$((TOTAL_TESTS - FAILED_TESTS - ERROR_TESTS - SKIPPED_TESTS))
+          
+          echo "| Metric | Count |" >> $GITHUB_STEP_SUMMARY
+          echo "|--------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Total Tests | $TOTAL_TESTS |" >> $GITHUB_STEP_SUMMARY
+          echo "| ✅ Passed | $PASSED_TESTS |" >> $GITHUB_STEP_SUMMARY
+          echo "| ❌ Failed | $FAILED_TESTS |" >> $GITHUB_STEP_SUMMARY
+          echo "| 🚫 Errors | $ERROR_TESTS |" >> $GITHUB_STEP_SUMMARY
+          echo "| ⏭️ Skipped | $SKIPPED_TESTS |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          if [ "$FAILED_TESTS" -gt 0 ] || [ "$ERROR_TESTS" -gt 0 ]; then
+            echo "❌ **Some tests failed**" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "### Failed Tests:" >> $GITHUB_STEP_SUMMARY
+            grep -l "failure\|error" target/surefire-reports/TEST-*.xml 2>/dev/null | while read file; do
+              echo "- $(basename "$file" .xml | sed 's/TEST-//')" >> $GITHUB_STEP_SUMMARY
+            done || echo "- Check test artifacts for details" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "✅ **All tests passed successfully!**" >> $GITHUB_STEP_SUMMARY
+          fi
+        else
+          echo "⚠️ **No test results found**" >> $GITHUB_STEP_SUMMARY
+        fi
         
     - name: Upload test results
       if: always()
