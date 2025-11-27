@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <!-- Required for system tray/menu bar access -->
+    <key>com.apple.security.automation.apple-events</key>
+    <true/>
+    
+    <!-- Required for launching VS Code -->
+    <key>com.apple.security.automation.execute</key>
+    <true/>
+    
+    <!-- Required for file system access to VS Code extensions -->
+    <key>com.apple.security.files.user-selected.read-write</key>
+    <true/>
+    
+    <!-- Required for reading VS Code configuration -->
+    <key>com.apple.security.files.downloads.read-write</key>
+    <true/>
+    
+    <!-- Required for network access (extension updates) -->
+    <key>com.apple.security.network.client</key>
+    <true/>
+    
+    <!-- Required for Login Items management -->
+    <key>com.apple.security.automation.login-item</key>
+    <true/>
+</dict>
+</plist>

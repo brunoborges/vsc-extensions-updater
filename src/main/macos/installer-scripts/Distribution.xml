@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<installer-gui-script minSpecVersion="2">
+    <title>VS Code Extension Updater</title>
+    <organization>io.github.brunoborges</organization>
+    
+    <welcome file="welcome.html"/>
+    <readme file="readme.html"/>
+    <license file="license.html"/>
+    <conclusion file="conclusion.html"/>
+    
+    <options customize="never" require-scripts="true" rootVolumeOnly="true"/>
+    
+    <volume-check>
+        <allowed-os-versions>
+            <os-version min="10.15"/>
+        </allowed-os-versions>
+    </volume-check>
+    
+    <choices-outline>
+        <line choice="default">
+            <line choice="vscode.extension.updater"/>
+        </line>
+    </choices-outline>
+    
+    <choice id="default"/>
+    
+    <choice id="vscode.extension.updater" visible="false">
+        <pkg-ref id="io.github.brunoborges.vscode-extension-updater"/>
+    </choice>
+    
+    <pkg-ref id="io.github.brunoborges.vscode-extension-updater">
+        <bundle-version>
+            <bundle id="io.github.brunoborges.vscode-extension-updater"/>
+        </bundle-version>
+    </pkg-ref>
+    
+    <product id="io.github.brunoborges.vscode-extension-updater" version="${project.version}"/>
+</installer-gui-script>
