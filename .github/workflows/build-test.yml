@@ -60,6 +60,7 @@ jobs:
       
     - name: Generate test report
       if: always()
+      shell: bash
       run: |
         echo "## Test Results for ${{ matrix.display-name }} - Java ${{ matrix.java }}" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
