@@ -66,12 +66,15 @@ fi
 
 jlink \
   --module-path "$JAVA_HOME/jmods" \
-  --add-modules java.base,java.desktop,java.logging,java.management,java.naming,java.security.jgss,java.instrument \
+  --add-modules java.base,java.desktop,java.logging,java.management,java.naming,java.security.jgss,java.instrument,java.net.http \
   --output target/custom-jre \
-  --compress 2 \
+  --compress zip-9 \
   --no-header-files \
   --no-man-pages \
-  --strip-debug
+  --strip-debug \
+  --strip-native-commands \
+  --bind-services \
+  --ignore-signing-information
 
 if [[ ! -d "target/custom-jre" ]]; then
     echo "❌ Error: Custom JRE was not created"
@@ -104,15 +107,17 @@ JPACKAGE_CMD="jpackage \
   --app-version 1.0 \
   --vendor \"Bruno Borges\" \
   --copyright \"2024 Bruno Borges\" \
-  --description \"Background application for updating VS Code extensions\" \
+  --description \"Background application for updating VS Code extensions with embedded Java runtime\" \
   --main-class com.vscode.updater.Application \
   --main-jar extension-updater-1.0.jar \
   --input target \
   --dest target/installer \
   --runtime-image target/custom-jre \
   --java-options \"-Djava.awt.headless=false\" \
-  --java-options \"-Xms32m\" \
-  --java-options \"-Xmx128m\" \
+  --java-options \"-Xms16m\" \
+  --java-options \"-Xmx64m\" \
+  --java-options \"-XX:+UseG1GC\" \
+  --java-options \"-XX:+UseStringDeduplication\" \
   --arguments \"--system-tray\" \
   --mac-package-identifier io.github.brunoborges.vscode-extension-updater \
   --mac-package-name \"VS Code Extension Updater\""

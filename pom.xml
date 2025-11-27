@@ -149,6 +149,7 @@
                 <mac.signing.keychain>login.keychain</mac.signing.keychain>
                 <mac.signing.identity>Developer ID Application: Bruno Borges</mac.signing.identity>
                 <mac.notarization.profile>vscode-updater-notarization</mac.notarization.profile>
+                <jlink.modules>java.base,java.desktop,java.logging,java.management,java.naming,java.security.jgss,java.instrument,java.net.http</jlink.modules>
             </properties>
             
             <build>
