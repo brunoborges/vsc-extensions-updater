@@ -122,6 +122,15 @@ JPACKAGE_CMD="jpackage \
   --mac-package-identifier io.github.brunoborges.vscode-extension-updater \
   --mac-package-name \"VS Code Extension Updater\""
 
+# Add macOS-specific icon if available
+ICON_PATH="src/main/macos/icons/vsc-updater.icns"
+if [[ -f "$ICON_PATH" ]]; then
+    echo "✅ Using custom application icon: $ICON_PATH"
+    JPACKAGE_CMD="$JPACKAGE_CMD --icon \"$ICON_PATH\""
+else
+    echo "⚠️  No custom icon found at $ICON_PATH - using default Java icon"
+fi
+
 # Add code signing if identity is provided
 if [[ -n "$SIGNING_IDENTITY" ]]; then
     echo "🔐 Code signing will be applied with identity: $SIGNING_IDENTITY"
