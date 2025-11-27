@@ -67,15 +67,15 @@ jobs:
     - name: Build application JAR
       run: mvn clean package -DskipTests
       
-    - name: Build Windows installer (unsigned for PR)
-      if: github.event_name == 'pull_request'
+    - name: Build Windows installer (unsigned for PR/manual)
+      if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'
       run: |
         Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope Process
         .\build-windows-installer.ps1
       shell: pwsh
           
     - name: Build Windows installer (signed for release)
-      if: startsWith(github.ref, 'refs/tags/') && github.event_name != 'pull_request'
+      if: startsWith(github.ref, 'refs/tags/') && github.event_name != 'pull_request' && github.event_name != 'workflow_dispatch'
       env:
         WIN_SIGNING_CERTIFICATE: ${{ secrets.WIN_SIGNING_CERTIFICATE }}
         WIN_SIGNING_PASSWORD: ${{ secrets.WIN_SIGNING_PASSWORD }}
