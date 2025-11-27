@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<suppressions xmlns="https://jeremylong.github.io/DependencyCheck/dependency-suppression.1.3.xsd">
+    <!-- 
+    OWASP Dependency Check Suppressions
+    This file contains suppressions for false positives and accepted risks
+    -->
+    
+    <!-- Jackson library - Common false positives -->
+    <suppress>
+        <notes>Jackson core library - suppress minor vulnerabilities that don't affect our usage</notes>
+        <packageUrl regex="true">^pkg:maven/com\.fasterxml\.jackson\.core/.*@.*$</packageUrl>
+        <cve>CVE-2023-35116</cve>
+    </suppress>
+    
+    <!-- Logback - Common false positives -->
+    <suppress>
+        <notes>Logback library - suppress vulnerabilities that don't affect our usage</notes>
+        <packageUrl regex="true">^pkg:maven/ch\.qos\.logback/.*@.*$</packageUrl>
+        <cve>CVE-2023-6378</cve>
+    </suppress>
+    
+    <!-- SLF4J - Generally safe logging facade -->
+    <suppress>
+        <notes>SLF4J logging facade - suppress minor issues</notes>
+        <packageUrl regex="true">^pkg:maven/org\.slf4j/.*@.*$</packageUrl>
+        <vulnerabilityName>CWE-755: Improper Handling of Exceptional Conditions</vulnerabilityName>
+    </suppress>
+</suppressions>

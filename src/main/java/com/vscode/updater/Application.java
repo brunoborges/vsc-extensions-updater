@@ -2,13 +2,14 @@ package com.vscode.updater;
 
 import com.vscode.updater.config.VSCodeConfig;
 import com.vscode.updater.config.ConfigManager;
+import com.vscode.updater.discovery.VSCodeDetector;
 import com.vscode.updater.tray.SystemTrayManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.swing.*;
-import javax.swing.UnsupportedLookAndFeelException;
 import java.awt.*;
+import java.util.Arrays;
 
 /**
  * Main application entry point for VS Code Extension Updater.
@@ -18,18 +19,25 @@ public class Application {
     private static final Logger logger = LoggerFactory.getLogger(Application.class);
     
     public static void main(String[] args) {
+        // Handle command-line arguments
+        if (handleCommandLineArgs(args)) {
+            return; // Exit after handling command-line args
+        }
+        
         logger.info("Starting VS Code Extension Updater v1.0 (Milestone 2)");
         logger.info("Java version: {}", System.getProperty("java.version"));
         logger.info("Operating System: {}", System.getProperty("os.name"));
         
-        // Check for headless environment
-        if (GraphicsEnvironment.isHeadless()) {
+        // Check for headless environment (unless specifically allowed for testing)
+        boolean allowHeadless = Arrays.asList(args).contains("--allow-headless");
+        if (GraphicsEnvironment.isHeadless() && !allowHeadless) {
             System.err.println("Error: This application requires a graphical environment.");
             System.exit(1);
         }
         
-        // Check system tray support
-        if (!SystemTray.isSupported()) {
+        // Check system tray support (unless in test mode)
+        boolean testMode = Arrays.asList(args).contains("--test-startup");
+        if (!SystemTray.isSupported() && !testMode) {
             System.err.println("Error: System tray is not supported on this platform.");
             System.exit(1);
         }
@@ -48,8 +56,10 @@ public class Application {
             String validationError = config.validate();
             if (validationError != null) {
                 logger.error("Invalid configuration: {}", validationError);
-                showErrorDialog("Configuration Error", 
-                    "Invalid configuration: " + validationError + "\n\nUsing default settings with detection.");
+                if (!testMode) {
+                    showErrorDialog("Configuration Error", 
+                        "Invalid configuration: " + validationError + "\n\nUsing default settings with detection.");
+                }
                 config = VSCodeConfig.createDefault();
                 config = configManager.refreshDetection(config); // Re-detect
             }
@@ -67,6 +77,12 @@ public class Application {
                     instance.version(),
                     instance.getShortPath())
             );
+            
+            // Handle test startup mode
+            if (testMode) {
+                logger.info("Test startup mode - exiting after initialization");
+                System.exit(0);
+            }
             
             // Initialize system tray with multi-instance support
             SystemTrayManager trayManager = new SystemTrayManager(config, configManager);
@@ -91,10 +107,85 @@ public class Application {
             
         } catch (Exception e) {
             logger.error("Failed to start application", e);
-            showErrorDialog("Startup Error", 
-                "Failed to start VS Code Extension Updater:\n" + e.getMessage());
+            if (!testMode) {
+                showErrorDialog("Startup Error", 
+                    "Failed to start VS Code Extension Updater:\n" + e.getMessage());
+            }
             System.exit(1);
         }
+    }
+    
+    /**
+     * Handle command-line arguments for testing and utility functions
+     * @param args Command line arguments
+     * @return true if application should exit after handling args
+     */
+    private static boolean handleCommandLineArgs(String[] args) {
+        for (String arg : args) {
+            switch (arg) {
+                case "--version":
+                    System.out.println("VS Code Extension Updater v1.0");
+                    System.out.println("Java: " + System.getProperty("java.version"));
+                    System.out.println("OS: " + System.getProperty("os.name"));
+                    return true;
+                    
+                case "--test-detection":
+                    testVSCodeDetection();
+                    return true;
+                    
+                case "--help":
+                    printHelp();
+                    return true;
+            }
+        }
+        return false;
+    }
+    
+    /**
+     * Test VS Code detection functionality
+     */
+    private static void testVSCodeDetection() {
+        System.out.println("Testing VS Code detection...");
+        try {
+            var instances = VSCodeDetector.detectInstallations();
+            
+            System.out.println("Found " + instances.size() + " VS Code instance(s):");
+            instances.forEach(instance -> {
+                System.out.println("  - " + instance.edition().getDisplayName() + 
+                                 " " + instance.version() + 
+                                 " at " + instance.executablePath());
+            });
+            
+            if (instances.isEmpty()) {
+                System.out.println("No VS Code installations detected.");
+                System.out.println("Make sure VS Code is installed in standard locations:");
+                System.out.println("  - /Applications/Visual Studio Code.app (macOS)");
+                System.out.println("  - /usr/bin/code (Linux)");
+                System.out.println("  - %LOCALAPPDATA%\\Programs\\Microsoft VS Code (Windows)");
+            }
+        } catch (Exception e) {
+            System.err.println("Error during VS Code detection: " + e.getMessage());
+            System.exit(1);
+        }
+    }
+    
+    /**
+     * Print help information
+     */
+    private static void printHelp() {
+        System.out.println("VS Code Extension Updater v1.0");
+        System.out.println();
+        System.out.println("Usage: java -jar extension-updater.jar [options]");
+        System.out.println();
+        System.out.println("Options:");
+        System.out.println("  --version           Show version information");
+        System.out.println("  --test-detection    Test VS Code detection");
+        System.out.println("  --test-startup      Test application startup (for CI)");
+        System.out.println("  --allow-headless    Allow running in headless environment");
+        System.out.println("  --system-tray       Start in system tray mode (default)");
+        System.out.println("  --help              Show this help message");
+        System.out.println();
+        System.out.println("When run without options, the application starts in system tray mode.");
     }
     
     private static void showStartupNotification(VSCodeConfig config) {

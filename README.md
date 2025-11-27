@@ -2,6 +2,8 @@
 
 <div align="center">
 
+[![CI - Build and Test](https://github.com/brunoborges/vsc-extensions-updater/actions/workflows/ci.yml/badge.svg)](https://github.com/brunoborges/vsc-extensions-updater/actions/workflows/ci.yml)
+[![macOS Installer](https://github.com/brunoborges/vsc-extensions-updater/actions/workflows/macos-installer.yml/badge.svg)](https://github.com/brunoborges/vsc-extensions-updater/actions/workflows/macos-installer.yml)
 [![Java](https://img.shields.io/badge/Java-21%2B-orange.svg)](https://www.oracle.com/java/technologies/javase/jdk21-archive-downloads.html)
 [![Maven](https://img.shields.io/badge/Maven-3.9%2B-blue.svg)](https://maven.apache.org/)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](https://opensource.org/licenses/MIT)
@@ -68,18 +70,28 @@ That's it! Look for the VS Code icon in your system tray.
 
 ## 📦 Installation
 
-### Option 1: Build from Source
+### Option 1: macOS Installer Package (Recommended)
+**Self-contained installer with embedded Java Runtime - No Java installation required!**
+
+1. Download the latest `.pkg` file from [GitHub Releases](https://github.com/brunoborges/vsc-extensions-updater/releases)
+2. Double-click the `.pkg` file to install
+3. The application will be installed to `/Applications/` and automatically appear in your menu bar
+4. Login Items will be configured for automatic startup
+
+**Requirements:** macOS 10.15+ (Intel or Apple Silicon)
+
+### Option 2: Build from Source
 ```bash
 git clone https://github.com/brunoborges/vsc-extensions-updater.git
 cd vsc-extensions-updater
 mvn clean package
 ```
 
-### Option 2: Download JAR
+### Option 3: Download JAR
 1. Download the latest `extension-updater-1.0.jar` from releases
 2. Run: `java -jar extension-updater-1.0.jar`
 
-### Option 3: Auto-Start Setup
+### Option 4: Auto-Start Setup
 **Windows:**
 1. Place the JAR in a permanent location
 2. Create a batch file or add to Windows Startup folder
@@ -91,6 +103,53 @@ mvn clean package
 **Linux:**
 1. Create a desktop entry or systemd user service
 2. Add to autostart applications
+
+## 🍎 macOS Installer Package
+
+### Features
+- ✅ **Self-Contained**: Includes embedded Java Runtime (no Java installation required)
+- ✅ **Native Integration**: Professional macOS installer experience
+- ✅ **Auto-Start**: Automatically configures Login Items for startup
+- ✅ **Universal Binary**: Supports both Intel and Apple Silicon Macs
+- ✅ **Code Signing Ready**: Supports Apple Developer ID signing and notarization
+- ✅ **Minimal Size**: ~68MB total package size (vs ~350MB+ for full JRE)
+
+### Installation Process
+The installer automatically:
+1. Installs the application to `/Applications/VS Code Extension Updater.app`
+2. Creates a Launch Agent for automatic startup
+3. Configures proper permissions and entitlements
+4. Sets up logging directories
+
+### Building Your Own Installer
+If you want to build the macOS installer locally:
+
+```bash
+# Install prerequisites (macOS only)
+brew install openjdk@21
+
+# Build unsigned installer
+./build-macos-installer.sh
+
+# Build signed installer (requires Apple Developer ID)
+export MAC_SIGNING_IDENTITY="Developer ID Application: Your Name"
+export MAC_NOTARIZATION_PROFILE="your-notarization-profile"
+./build-macos-installer.sh
+```
+
+The installer will be created at: `target/installer/VS Code Extension Updater-1.0.pkg`
+
+For detailed instructions, see: [macOS Installer Build Guide](docs/MACOS_INSTALLER_BUILD.md)
+
+### Uninstallation
+```bash
+# Use the provided uninstall script
+bash src/main/scripts/uninstall.sh
+
+# Or manually remove
+sudo rm -rf "/Applications/VS Code Extension Updater.app"
+rm -f ~/Library/LaunchAgents/io.github.brunoborges.vscode-extension-updater.plist
+```
 
 ## 🎮 Usage
 
