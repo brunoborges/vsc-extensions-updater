@@ -152,10 +152,12 @@ $jpackageArgs = @(
 )
 
 # Add Windows-specific icon if available
-$iconPath = "src/main/windows/icons/app.ico"
+$iconPath = "src/main/windows/icons/vsc-updater.ico"
 if (Test-Path $iconPath) {
     $jpackageArgs += "--icon", $iconPath
-    Write-Host "✅ Using custom icon: $iconPath" -ForegroundColor Green
+    Write-Host "✅ Using custom application icon: $iconPath" -ForegroundColor Green
+} else {
+    Write-Host "⚠️  No custom icon found at $iconPath" -ForegroundColor Yellow
 }
 
 # Add resource directory if available

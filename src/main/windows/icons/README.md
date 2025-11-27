@@ -1,41 +1,53 @@
-# Windows Icon Placeholder
+# Windows Icons
 
-This file is a placeholder for the Windows application icon (app.ico).
+This directory contains icon resources for the Windows installer.
 
-To create a proper Windows icon:
+## Current Icons
 
-1. **Design Requirements:**
-   - Multiple resolutions: 16x16, 32x32, 48x48, 256x256 pixels
-   - 32-bit color with alpha channel support
-   - Clean, recognizable design that works at small sizes
+- **vsc-updater.ico** - Main application icon (converted from PNG logo)
+  - Multi-resolution ICO file with sizes: 16x16, 32x32, 48x48, 64x64, 128x128, 256x256
+  - Used by jpackage for installer package, desktop shortcuts, and system tray
+  - Source: `src/main/resources/vsc-updater-logo.png`
 
-2. **Tools:**
-   - Free: GIMP with ICO plugin, Paint.NET with ICO plugin
-   - Commercial: Adobe Photoshop, IcoFX, Axialis IconWorkshop
+## Icon Usage
 
-3. **Creation Steps:**
-   - Design the icon at 256x256 pixels
-   - Create versions at smaller sizes with appropriate simplification
-   - Save as .ico file with all sizes embedded
-   - Place as `app.ico` in this directory
-
-4. **Best Practices:**
-   - Use vector graphics for scalability
-   - Ensure visibility on both light and dark backgrounds
-   - Test at all sizes, especially 16x16 and 32x32
-   - Consider Windows 11 design guidelines
-
-5. **Recommended Colors:**
-   - Use your brand colors
-   - Ensure sufficient contrast
-   - Consider accessibility guidelines
-
-Once created, the Windows installer will automatically use this icon for:
-- Application executable
+The `vsc-updater.ico` file is automatically used by:
+- Windows installer (MSI package)
 - Desktop shortcut
-- Start menu entry
-- Control Panel entry
-- Taskbar/system tray
+- Start Menu entry  
+- System tray icon
+- Application title bar
+- Windows taskbar
+- Add/Remove Programs
 
-## Current Status
-⚠️ **Placeholder** - Replace with actual .ico file for production builds
+## Regenerating Icons
+
+If you need to update the icon from the source PNG:
+
+```bash
+# Install ImageMagick (if not already installed)
+brew install imagemagick
+
+# Convert PNG to ICO with multiple resolutions
+convert src/main/resources/vsc-updater-logo.png \
+  \( -clone 0 -resize 16x16 \) \
+  \( -clone 0 -resize 32x32 \) \
+  \( -clone 0 -resize 48x48 \) \
+  \( -clone 0 -resize 64x64 \) \
+  \( -clone 0 -resize 128x128 \) \
+  \( -clone 0 -resize 256x256 \) \
+  -delete 0 src/main/windows/icons/vsc-updater.ico
+```
+
+## Icon Requirements
+
+Windows ICO files should include multiple sizes for optimal display across different UI contexts:
+- 16x16 - Small icons (details view)
+- 32x32 - Medium icons (list view) 
+- 48x48 - Large icons (icon view)
+- 64x64 - Extra large icons
+- 128x128 - Jumbo icons
+- 256x256 - High DPI displays
+
+## Status
+✅ **Production Ready** - Professional application icon integrated
