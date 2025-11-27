@@ -4,6 +4,7 @@
 
 [![CI - Build and Test](https://github.com/brunoborges/vsc-extensions-updater/actions/workflows/ci.yml/badge.svg)](https://github.com/brunoborges/vsc-extensions-updater/actions/workflows/ci.yml)
 [![macOS Installer](https://github.com/brunoborges/vsc-extensions-updater/actions/workflows/macos-installer.yml/badge.svg)](https://github.com/brunoborges/vsc-extensions-updater/actions/workflows/macos-installer.yml)
+[![Windows Installer](https://github.com/brunoborges/vsc-extensions-updater/actions/workflows/windows-installer.yml/badge.svg)](https://github.com/brunoborges/vsc-extensions-updater/actions/workflows/windows-installer.yml)
 [![Java](https://img.shields.io/badge/Java-21%2B-orange.svg)](https://www.oracle.com/java/technologies/javase/jdk21-archive-downloads.html)
 [![Maven](https://img.shields.io/badge/Maven-3.9%2B-blue.svg)](https://maven.apache.org/)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](https://opensource.org/licenses/MIT)
@@ -70,15 +71,24 @@ That's it! Look for the VS Code icon in your system tray.
 
 ## 📦 Installation
 
-### Option 1: macOS Installer Package (Recommended)
-**Self-contained installer with embedded Java Runtime - No Java installation required!**
+### Option 1: Native Installer Packages (Recommended)
+**Self-contained installers with embedded Java Runtime - No Java installation required!**
 
+#### 🍎 macOS Package
 1. Download the latest `.pkg` file from [GitHub Releases](https://github.com/brunoborges/vsc-extensions-updater/releases)
 2. Double-click the `.pkg` file to install
 3. The application will be installed to `/Applications/` and automatically appear in your menu bar
 4. Login Items will be configured for automatic startup
 
 **Requirements:** macOS 10.15+ (Intel or Apple Silicon)
+
+#### 🪟 Windows Package  
+1. Download the latest `.msi` file from [GitHub Releases](https://github.com/brunoborges/vsc-extensions-updater/releases)
+2. Double-click the `.msi` file to install  
+3. The application will be installed to Program Files and automatically appear in your system tray
+4. Desktop shortcut and Start Menu entry will be created
+
+**Requirements:** Windows 10 version 1809+ (64-bit)
 
 ### Option 2: Build from Source
 ```bash
@@ -140,6 +150,51 @@ export MAC_NOTARIZATION_PROFILE="your-notarization-profile"
 The installer will be created at: `target/installer/VS Code Extension Updater-1.0.pkg`
 
 For detailed instructions, see: [macOS Installer Build Guide](docs/MACOS_INSTALLER_BUILD.md)
+
+## 🪟 Windows Installer Package
+
+### Features
+- ✅ **Self-Contained**: Includes embedded Java Runtime (no Java installation required)
+- ✅ **Native Integration**: Professional Windows MSI installer experience  
+- ✅ **System Tray**: Automatically integrates with Windows system tray
+- ✅ **Start Menu & Shortcuts**: Desktop shortcut and Start Menu entry
+- ✅ **Code Signing Ready**: Supports Authenticode signing for enhanced security
+- ✅ **Minimal Size**: ~100MB total package size (vs ~200MB+ for full JRE)
+
+### Installation Process
+The installer automatically:
+1. Installs the application to `%ProgramFiles%\VSCodeExtensionUpdater`
+2. Creates desktop shortcut and Start Menu entry
+3. Configures Windows system tray integration
+4. Sets up application data directories
+5. Provides standard uninstall support
+
+### Building Your Own Installer
+If you want to build the Windows installer locally:
+
+```powershell
+# Install prerequisites (Windows only)
+# Ensure Java 21+ JDK is installed
+
+# Build unsigned installer  
+.\build-windows-installer.ps1
+
+# Build signed installer (requires code signing certificate)
+$env:WIN_SIGNING_CERTIFICATE = "base64-certificate-data"
+$env:WIN_SIGNING_PASSWORD = "certificate-password"
+.\build-windows-installer.ps1
+```
+
+The installer will be created at: `target\installer\VSCodeExtensionUpdater-1.0.0.msi`
+
+For detailed instructions, see: [Windows Installer Guide](docs/windows-installer.md)
+
+### Uninstallation
+```cmd
+# Use Add/Remove Programs in Windows Settings
+# Or run from command line:
+msiexec /x "VSCodeExtensionUpdater-1.0.0.msi"
+```
 
 ### Uninstallation
 ```bash
