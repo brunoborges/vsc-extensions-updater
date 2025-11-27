@@ -393,10 +393,10 @@ public class SystemTrayManager implements MultiInstanceMenuBuilder.MenuActionHan
     
     private Image createTrayIcon() {
         try {
-            // Load the VS Code logo from resources
-            InputStream imageStream = getClass().getResourceAsStream("/vscode-logo.png");
+            // Load the VSCode Extension Updater logo from resources
+            InputStream imageStream = getClass().getResourceAsStream("/vsc-updater-logo.png");
             if (imageStream == null) {
-                logger.warn("Could not find vscode-logo.png in resources, falling back to programmatic icon");
+                logger.warn("Could not find vsc-updater-logo.png in resources, falling back to programmatic icon");
                 return createFallbackTrayIcon();
             }
             

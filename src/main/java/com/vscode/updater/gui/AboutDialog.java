@@ -4,11 +4,15 @@ import com.vscode.updater.util.AppInfo;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.imageio.ImageIO;
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
 import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.KeyEvent;
+import java.awt.image.BufferedImage;
+import java.io.IOException;
+import java.io.InputStream;
 
 /**
  * About dialog for the VS Code Extension Updater application.
@@ -88,7 +92,34 @@ public class AboutDialog extends JDialog {
     }
     
     private ImageIcon createAppIcon() {
-        // Create a simple 32x32 icon
+        try {
+            // Load the VSCode Extension Updater logo from resources
+            InputStream imageStream = getClass().getResourceAsStream("/vsc-updater-logo.png");
+            if (imageStream != null) {
+                BufferedImage originalImage = ImageIO.read(imageStream);
+                imageStream.close();
+                
+                // Scale to 32x32 for the about dialog
+                int size = 32;
+                BufferedImage scaledImage = new BufferedImage(size, size, BufferedImage.TYPE_INT_ARGB);
+                Graphics2D g = scaledImage.createGraphics();
+                g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BICUBIC);
+                g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                g.drawImage(originalImage, 0, 0, size, size, null);
+                g.dispose();
+                
+                return new ImageIcon(scaledImage);
+            }
+        } catch (IOException e) {
+            logger.warn("Could not load application logo, falling back to programmatic icon", e);
+        }
+        
+        // Fallback to programmatic icon if logo can't be loaded
+        return createFallbackIcon();
+    }
+    
+    private ImageIcon createFallbackIcon() {
+        // Create a simple 32x32 fallback icon
         int size = 32;
         java.awt.image.BufferedImage image = new java.awt.image.BufferedImage(
             size, size, java.awt.image.BufferedImage.TYPE_INT_ARGB);
