@@ -2,6 +2,8 @@
 
 <div align="center">
 
+<img src="src/main/resources/vsc-updater-logo.png" alt="VS Code Extension Updater Logo" width="128">
+
 [![CI - Build and Test](https://github.com/brunoborges/vsc-extensions-updater/actions/workflows/ci.yml/badge.svg)](https://github.com/brunoborges/vsc-extensions-updater/actions/workflows/ci.yml)
 [![macOS Installer](https://github.com/brunoborges/vsc-extensions-updater/actions/workflows/macos-installer.yml/badge.svg)](https://github.com/brunoborges/vsc-extensions-updater/actions/workflows/macos-installer.yml)
 [![Windows Installer](https://github.com/brunoborges/vsc-extensions-updater/actions/workflows/windows-installer.yml/badge.svg)](https://github.com/brunoborges/vsc-extensions-updater/actions/workflows/windows-installer.yml)
