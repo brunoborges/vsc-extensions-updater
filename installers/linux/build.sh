@@ -3,6 +3,10 @@
 
 set -e  # Exit on any error
 
+# Ensure we are in the project root
+PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+cd "$PROJECT_ROOT"
+
 echo "🐧 Building Linux DEB Installer with Embedded Java Runtime"
 echo "======================================================="
 
@@ -69,10 +73,15 @@ echo "✅ Application JAR built successfully: $JAR_FILE"
 echo ""
 echo "⚙️ Creating custom JRE with jlink..."
 
-if [[ -d "target/runtime-image" ]]; then
+# Use a temporary directory for the runtime image to avoid filesystem issues on WSL/mounted drives
+RUNTIME_IMAGE="/tmp/vscode-updater-runtime-$$"
+if [[ -d "$RUNTIME_IMAGE" ]]; then
     echo "🧹 Removing existing custom JRE..."
-    rm -rf target/runtime-image
+    rm -rf "$RUNTIME_IMAGE"
 fi
+
+# Ensure cleanup on exit
+trap 'rm -rf "$RUNTIME_IMAGE"' EXIT
 
 # Detect modules (simplified approach - add basic modules)
 # For a real app, use jdeps to find exact modules: jdeps --print-module-deps ...
@@ -80,28 +89,28 @@ MODULES="java.base,java.desktop,java.logging,java.management,java.naming,java.ne
 
 jlink \
   --add-modules "$MODULES" \
-  --output target/runtime-image \
-  --compress 2 \
+  --output "$RUNTIME_IMAGE" \
+  --compress zip-6 \
   --no-header-files \
   --no-man-pages \
   --strip-debug
 
-if [[ ! -d "target/runtime-image" ]]; then
+if [[ ! -d "$RUNTIME_IMAGE" ]]; then
     echo "❌ Error: Custom JRE was not created"
     exit 1
 fi
 
-echo "✅ Custom JRE created successfully"
+echo "✅ Custom JRE created successfully at $RUNTIME_IMAGE"
 
 # Step 3: Create installer package using jpackage
 echo ""
 echo "📦 Creating Linux DEB installer package..."
 
 # Remove existing installer output
-if [[ -d "target/installer-output" ]]; then
-    rm -rf target/installer-output
+if [[ -d "target/installer" ]]; then
+    rm -rf target/installer
 fi
-mkdir -p target/installer-output
+mkdir -p target/installer
 
 # Prepare input directory
 if [[ -d "target/installer-input" ]]; then
@@ -115,11 +124,11 @@ APP_NAME="VSCodeExtensionUpdater"
 APP_VERSION="1.0.0"
 VENDOR="Bruno Borges"
 DESCRIPTION="Background application for updating VS Code extensions"
-ICON_PATH="src/main/resources/vsc-updater-logo.png"
+ICON_PATH="src/main/linux/icon.png"
 
 JPACKAGE_CMD="jpackage \
   --type deb \
-  --dest target/installer-output \
+  --dest target/installer \
   --input target/installer-input \
   --name $APP_NAME \
   --app-version $APP_VERSION \
@@ -128,7 +137,7 @@ JPACKAGE_CMD="jpackage \
   --description \"$DESCRIPTION\" \
   --main-jar $JAR_NAME \
   --main-class com.vscode.updater.Application \
-  --runtime-image target/runtime-image \
+  --runtime-image \"$RUNTIME_IMAGE\" \
   --linux-shortcut \
   --linux-menu-group \"VSCode Tools\" \
   --linux-deb-maintainer \"$VENDOR <bruno.borges@example.com>\" \
@@ -151,7 +160,7 @@ if [[ $? -ne 0 ]]; then
     exit 1
 fi
 
-DEB_FILE=$(find target/installer-output -name "*.deb" | head -n1)
+DEB_FILE=$(find target/installer -name "*.deb" | head -n1)
 if [[ -z "$DEB_FILE" ]]; then
     echo "❌ Error: No .deb file was created"
     exit 1

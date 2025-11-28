@@ -45,7 +45,7 @@ git clone https://github.com/brunoborges/vsc-extensions-updater.git
 cd vsc-extensions-updater
 
 # Build installer (unsigned)
-.\build-windows-installer.ps1
+.\installers\windows\build.ps1
 ```
 
 ### GitHub Actions (Recommended)
@@ -77,7 +77,7 @@ on:
 3. **Create installer**:
    ```powershell
    Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope Process
-   .\build-windows-installer.ps1
+   .\installers\windows\build.ps1
    ```
 
 4. **Find output**:

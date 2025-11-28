@@ -141,12 +141,12 @@ If you want to build the macOS installer locally:
 brew install openjdk@21
 
 # Build unsigned installer
-./build-macos-installer.sh
+bash installers/macos/build.sh
 
 # Build signed installer (requires Apple Developer ID)
 export MAC_SIGNING_IDENTITY="Developer ID Application: Your Name"
 export MAC_NOTARIZATION_PROFILE="your-notarization-profile"
-./build-macos-installer.sh
+bash installers/macos/build.sh
 ```
 
 The installer will be created at: `target/installer/VS Code Extension Updater-1.0.pkg`
@@ -179,12 +179,12 @@ If you want to build the Windows installer locally:
 # Ensure Java 21+ JDK is installed
 
 # Build unsigned installer  
-.\build-windows-installer.ps1
+.\installers\windows\build.ps1
 
 # Build signed installer (requires code signing certificate)
 $env:WIN_SIGNING_CERTIFICATE = "base64-certificate-data"
 $env:WIN_SIGNING_PASSWORD = "certificate-password"
-.\build-windows-installer.ps1
+.\installers\windows\build.ps1
 ```
 
 The installer will be created at: `target\installer\VSCodeExtensionUpdater-1.0.0.msi`

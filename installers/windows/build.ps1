@@ -4,6 +4,11 @@
 
 $ErrorActionPreference = "Stop"
 
+# Ensure we are in the project root
+$ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Definition
+$ProjectRoot = Resolve-Path (Join-Path $ScriptDir "..\..")
+Set-Location $ProjectRoot
+
 # --- Configuration ---
 $AppName = "VSCodeExtensionUpdater"
 $AppVersion = "1.0.0"
@@ -17,7 +22,7 @@ $TargetDir = Resolve-Path "target" -ErrorAction SilentlyContinue
 if (-not $TargetDir) { New-Item -ItemType Directory -Path "target" | Out-Null; $TargetDir = Resolve-Path "target" }
 
 $InstallerInput = Join-Path $TargetDir "installer-input"
-$InstallerOutput = Join-Path $TargetDir "installer-output"
+$InstallerOutput = Join-Path $TargetDir "installer"
 $RuntimeImage = Join-Path $TargetDir "runtime-image"
 
 # --- Helper Functions ---
@@ -102,7 +107,7 @@ if (-not (Test-Path $RuntimeImage)) {
         "--strip-debug",
         "--no-man-pages",
         "--no-header-files",
-        "--compress", "2",
+        "--compress", "zip-6",
         "--add-modules", $Modules,
         "--output", $RuntimeImage
     )

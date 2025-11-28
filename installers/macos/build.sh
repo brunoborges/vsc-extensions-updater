@@ -3,6 +3,10 @@
 
 set -e  # Exit on any error
 
+# Ensure we are in the project root
+PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+cd "$PROJECT_ROOT"
+
 echo "🍎 Building macOS Installer with Embedded Java Runtime"
 echo "================================================="
 

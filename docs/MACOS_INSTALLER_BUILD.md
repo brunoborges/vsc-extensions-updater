@@ -31,7 +31,7 @@ ls $JAVA_HOME/jmods
 mvn clean package
 
 # Build macOS installer package (unsigned)
-mvn package -Pmacos-installer -DskipTests
+bash installers/macos/build.sh
 ```
 
 The installer will be created at: `target/installer/VSCodeExtensionUpdater-1.0.pkg`
@@ -44,9 +44,7 @@ export MAC_SIGNING_IDENTITY="Developer ID Application: Your Name"
 export MAC_NOTARIZATION_PROFILE="your-notarization-profile"
 
 # Build signed installer
-mvn package -Pmacos-installer -DskipTests \
-  -Dmac.signing.identity="$MAC_SIGNING_IDENTITY" \
-  -Dmac.notarization.profile="$MAC_NOTARIZATION_PROFILE"
+bash installers/macos/build.sh
 ```
 
 ## Detailed Configuration
