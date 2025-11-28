@@ -1,269 +1,211 @@
-# build-windows-installer.ps1 - Build Windows installer package with embedded JRE
+# build-windows-installer.ps1
+# Script to build a Windows Installer (MSI) using jpackage
+# Requires: JDK 14+ (with jpackage), Maven, and WiX Toolset 3.x
 
-# Set strict error handling
 $ErrorActionPreference = "Stop"
 
-Write-Host "🪟 Building Windows Installer with Embedded Java Runtime" -ForegroundColor Cyan
-Write-Host "=======================================================" -ForegroundColor Cyan
+# --- Configuration ---
+$AppName = "VSCodeExtensionUpdater"
+$AppVersion = "1.0.0"
+$Vendor = "Bruno Borges"
+$Copyright = "Copyright 2025 Bruno Borges"
+$Description = "Background application for updating VS Code extensions"
+$MainClass = "com.vscode.updater.Application"
 
-# Validate prerequisites
-Write-Host ""
-Write-Host "📋 Validating prerequisites..." -ForegroundColor Yellow
+# Paths
+$TargetDir = Resolve-Path "target" -ErrorAction SilentlyContinue
+if (-not $TargetDir) { New-Item -ItemType Directory -Path "target" | Out-Null; $TargetDir = Resolve-Path "target" }
 
-# Check if we're on Windows
-if ($IsLinux -or $IsMacOS) {
-    Write-Host "❌ Error: This script must be run on Windows" -ForegroundColor Red
-    exit 1
-}
+$InstallerInput = Join-Path $TargetDir "installer-input"
+$InstallerOutput = Join-Path $TargetDir "installer-output"
+$RuntimeImage = Join-Path $TargetDir "runtime-image"
 
-# Check if Java 21+ is available
-try {
-    $javaVersion = java -version 2>&1 | Select-String '"(\d+)' | ForEach-Object { $_.Matches.Groups[1].Value }
-    if ([int]$javaVersion -lt 21) {
-        Write-Host "❌ Error: Java 21+ is required (found: $javaVersion)" -ForegroundColor Red
-        exit 1
+# --- Helper Functions ---
+
+function Check-Command($cmd) {
+    if (-not (Get-Command $cmd -ErrorAction SilentlyContinue)) {
+        return $false
     }
-    Write-Host "✅ Java $javaVersion available" -ForegroundColor Green
-} catch {
-    Write-Host "❌ Error: Java is not installed or not in PATH" -ForegroundColor Red
-    exit 1
+    return $true
 }
 
-# Check if jlink is available
-try {
-    $jlinkVersion = jlink --version 2>&1
-    Write-Host "✅ jlink available: $jlinkVersion" -ForegroundColor Green
-} catch {
-    Write-Host "❌ Error: jlink is not available. Make sure you have a full JDK (not just JRE)" -ForegroundColor Red
-    exit 1
+function Clean-Directory($path) {
+    if (Test-Path $path) {
+        Write-Host "Cleaning $path..." -ForegroundColor Gray
+        # Use cmd /c rmdir for robust removal of deep paths/symlinks
+        $winPath = $path -replace '/', '\'
+        cmd /c "rmdir /s /q `"$winPath`"" | Out-Null
+    }
+    if (Test-Path $path) {
+        # Fallback if cmd failed (e.g. file locked)
+        Remove-Item -Recurse -Force $path -ErrorAction Continue
+    }
 }
 
-# Check if jmods directory exists
-$javaHome = $env:JAVA_HOME
-if (-not $javaHome) {
-    $javaHome = (Get-Command java).Source | Split-Path | Split-Path
+# --- Main Script ---
+
+Write-Host "`n=== Building Windows Installer for $AppName ===`n" -ForegroundColor Cyan
+
+# 1. Check Prerequisites
+Write-Host "Checking prerequisites..." -ForegroundColor Yellow
+
+if (-not (Check-Command "java")) { Write-Error "Java not found in PATH."; exit 1 }
+if (-not (Check-Command "jpackage")) { Write-Error "jpackage not found. Please use JDK 14+."; exit 1 }
+if (-not (Check-Command "mvn") -and -not (Test-Path "mvnw.cmd")) { Write-Error "Maven not found."; exit 1 }
+
+# Check for WiX 3.x (Required for MSI/EXE)
+# jpackage specifically looks for light.exe and candle.exe
+if (-not (Check-Command "light.exe") -or -not (Check-Command "candle.exe")) {
+    Write-Warning "WiX Toolset 3.x (light.exe/candle.exe) not found in PATH."
+    Write-Warning "jpackage requires WiX 3.x to build MSI/EXE installers."
+    Write-Warning "WiX 4/5 (wix.exe) is NOT compatible with jpackage out of the box."
+    Write-Warning "Please install WiX 3.11 from: https://github.com/wixtoolset/wix3/releases"
+    Write-Warning "Add the WiX bin directory to your PATH environment variable."
+    
+    Write-Warning "Attempting to proceed anyway (this will likely fail)..."
+    Start-Sleep -Seconds 3
+} else {
+    Write-Host "Found WiX Toolset 3.x." -ForegroundColor Green
 }
 
-$jmodsPath = Join-Path $javaHome "jmods"
-if (-not (Test-Path $jmodsPath)) {
-    Write-Host "❌ Error: $jmodsPath directory not found" -ForegroundColor Red
-    Write-Host "Make sure you have a full JDK installation with jmods" -ForegroundColor Red
-    exit 1
+# 2. Build with Maven (Clean first)
+Write-Host "`nBuilding JAR with Maven..." -ForegroundColor Yellow
+$MvnCmd = if (Test-Path "mvnw.cmd") { ".\mvnw.cmd" } else { "mvn" }
+& $MvnCmd clean package -DskipTests
+
+if ($LASTEXITCODE -ne 0) { Write-Error "Maven build failed."; exit 1 }
+
+# 3. Prepare Directories (After Maven build, as 'clean' removes target)
+Write-Host "`nPreparing directories..." -ForegroundColor Yellow
+Clean-Directory $InstallerInput
+Clean-Directory $InstallerOutput
+
+New-Item -ItemType Directory -Path $InstallerInput | Out-Null
+New-Item -ItemType Directory -Path $InstallerOutput | Out-Null
+
+$JarFile = Get-ChildItem "target/extension-updater-*.jar" | Select-Object -First 1
+if (-not $JarFile) { Write-Error "JAR file not found."; exit 1 }
+
+Write-Host "Copying $($JarFile.Name) to input directory..."
+Copy-Item $JarFile.FullName -Destination $InstallerInput
+
+# 4. Create Runtime Image (jlink)
+# This creates a smaller, bundled JRE
+if (-not (Test-Path $RuntimeImage)) {
+    Write-Host "`nCreating custom runtime image (jlink)..." -ForegroundColor Yellow
+    
+    # Detect modules (simplified approach - add basic modules)
+    # For a real app, use jdeps to find exact modules: jdeps --print-module-deps ...
+    $Modules = "java.base,java.desktop,java.logging,java.management,java.naming,java.net.http,java.scripting,java.xml"
+    
+    $JlinkArgs = @(
+        "--strip-debug",
+        "--no-man-pages",
+        "--no-header-files",
+        "--compress", "2",
+        "--add-modules", $Modules,
+        "--output", $RuntimeImage
+    )
+    
+    Write-Host "Running jlink..."
+    & jlink $JlinkArgs
+    if ($LASTEXITCODE -ne 0) { Write-Error "jlink failed."; exit 1 }
+} else {
+    Write-Host "`nUsing existing runtime image at $RuntimeImage" -ForegroundColor Gray
 }
 
-Write-Host "✅ jmods directory: $jmodsPath" -ForegroundColor Green
+$WixTempDir = Join-Path $TargetDir "wix-temp"
+Clean-Directory $WixTempDir
 
-# Check if jpackage is available (Java 14+)
-try {
-    $jpackageVersion = jpackage --version 2>&1
-    Write-Host "✅ jpackage available: $jpackageVersion" -ForegroundColor Green
-} catch {
-    Write-Host "❌ Error: jpackage is not available. Make sure you have Java 14+ with jpackage" -ForegroundColor Red
-    exit 1
-}
+# 5. Run jpackage
+Write-Host "`nRunning jpackage..." -ForegroundColor Yellow
 
-# Step 1: Clean and build application JAR
-Write-Host ""
-Write-Host "🔨 Building application JAR..." -ForegroundColor Yellow
-
-& mvn clean package -DskipTests
-
-if (-not (Test-Path "target/extension-updater-1.0.jar")) {
-    Write-Host "❌ Error: Application JAR was not created" -ForegroundColor Red
-    exit 1
-}
-
-Write-Host "✅ Application JAR built successfully" -ForegroundColor Green
-
-# Step 2: Create custom JRE with jlink
-Write-Host ""
-Write-Host "⚙️ Creating custom JRE with jlink..." -ForegroundColor Yellow
-
-$customJrePath = "target/custom-jre"
-if (Test-Path $customJrePath) {
-    Write-Host "🧹 Removing existing custom JRE..." -ForegroundColor Blue
-    Remove-Item -Recurse -Force $customJrePath
-}
-
-# Create custom JRE with optimized modules for Windows
-$jlinkArgs = @(
-    "--module-path", $jmodsPath,
-    "--add-modules", "java.base,java.desktop,java.logging,java.management,java.naming,java.security.jgss,java.instrument,java.net.http,java.datatransfer,java.security.sasl",
-    "--output", $customJrePath,
-    "--compress", "zip-9",
-    "--no-header-files",
-    "--no-man-pages",
-    "--strip-debug",
-    "--strip-native-commands",
-    "--bind-services",
-    "--ignore-signing-information"
-)
-
-& jlink @jlinkArgs
-
-if (-not (Test-Path $customJrePath)) {
-    Write-Host "❌ Error: Custom JRE was not created" -ForegroundColor Red
-    exit 1
-}
-
-# Show JRE size
-$jreSize = (Get-ChildItem -Recurse $customJrePath | Measure-Object -Property Length -Sum).Sum / 1MB
-Write-Host "✅ Custom JRE created successfully (Size: $([math]::Round($jreSize, 1)) MB)" -ForegroundColor Green
-
-# Step 3: Create installer package using jpackage
-Write-Host ""
-Write-Host "📦 Creating Windows installer package..." -ForegroundColor Yellow
-
-# Remove existing installer output
-$installerPath = "target/installer"
-if (Test-Path $installerPath) {
-    Remove-Item -Recurse -Force $installerPath
-}
-
-New-Item -ItemType Directory -Path $installerPath -Force | Out-Null
-
-# Parse signing parameters (from environment)
-$signingCertificate = $env:WIN_SIGNING_CERTIFICATE
-$signingPassword = $env:WIN_SIGNING_PASSWORD
-
-# Prepare jpackage arguments
-$jpackageArgs = @(
+$JPackageArgs = @(
     "--type", "msi",
-    "--name", "VSCodeExtensionUpdater",
-    "--app-version", "1.0.0",
-    "--vendor", "Bruno Borges",
-    "--copyright", "2024 Bruno Borges",
-    "--description", "Background application for updating VS Code extensions with embedded Java runtime",
-    "--main-class", "com.vscode.updater.Application",
-    "--main-jar", "extension-updater-1.0.jar",
-    "--input", "target",
-    "--dest", $installerPath,
-    "--runtime-image", $customJrePath,
-    "--java-options", "-Djava.awt.headless=false",
-    "--java-options", "-Xms16m",
-    "--java-options", "-Xmx64m",
-    "--java-options", "-XX:+UseG1GC",
-    "--java-options", "-XX:+UseStringDeduplication",
-    "--arguments", "--system-tray",
-    "--win-package-identifier", "io.github.brunoborges.vscode-extension-updater",
+    "--dest", $InstallerOutput,
+    "--input", $InstallerInput,
+    "--name", $AppName,
+    "--app-version", $AppVersion,
+    "--vendor", $Vendor,
+    "--copyright", $Copyright,
+    "--description", $Description,
+    "--main-jar", $JarFile.Name,
+    "--main-class", $MainClass,
+    "--runtime-image", $RuntimeImage,
+    "--win-dir-chooser",
     "--win-menu",
+    "--win-menu-group", "VSCode Tools",
     "--win-shortcut",
-    "--win-dir-chooser"
+    "--java-options", "-Dfile.encoding=UTF-8",
+    "--temp", $WixTempDir,
+    "--verbose"
 )
 
-# Add Windows-specific icon if available
-$iconPath = "src/main/windows/icons/vsc-updater.ico"
-if (Test-Path $iconPath) {
-    $jpackageArgs += "--icon", $iconPath
-    Write-Host "✅ Using custom application icon: $iconPath" -ForegroundColor Green
-} else {
-    Write-Host "⚠️  No custom icon found at $iconPath" -ForegroundColor Yellow
+# Add icon if it exists
+$IconPath = "src/main/windows/icons/vsc-updater.ico"
+if (Test-Path $IconPath) {
+    $JPackageArgs += "--icon"
+    $JPackageArgs += $IconPath
 }
 
-# Add resource directory if available
-$resourcePath = "src/main/windows/resources"
-if (Test-Path $resourcePath) {
-    $jpackageArgs += "--resource-dir", $resourcePath
-    Write-Host "✅ Using custom resources: $resourcePath" -ForegroundColor Green
-}
+Write-Host "Command: jpackage $JPackageArgs" -ForegroundColor Gray
 
-# Add code signing if certificate is provided
-if ($signingCertificate -and $signingPassword) {
-    Write-Host "🔐 Code signing will be applied" -ForegroundColor Blue
+# Capture output to parse for WiX command if failure occurs
+$JPackageOutput = & jpackage $JPackageArgs 2>&1 | Tee-Object -FilePath "jpackage.log"
+$JPackageExitCode = $LASTEXITCODE
+
+if ($JPackageExitCode -ne 0) { 
+    Write-Warning "jpackage failed (Exit code $JPackageExitCode)."
     
-    # Decode base64 certificate and save to temporary file
-    $certBytes = [System.Convert]::FromBase64String($signingCertificate)
-    $certPath = "temp-certificate.p12"
-    [System.IO.File]::WriteAllBytes($certPath, $certBytes)
-    
-    try {
-        # Import certificate to store
-        $cert = Import-PfxCertificate -FilePath $certPath -CertStoreLocation "Cert:\CurrentUser\My" -Password (ConvertTo-SecureString -String $signingPassword -AsPlainText -Force)
-        Write-Host "✅ Certificate imported successfully" -ForegroundColor Green
+    # Check if we can recover by building manually with WiX
+    $MainWxs = Join-Path $WixTempDir "config/main.wxs"
+    if (Test-Path $MainWxs) {
+        Write-Host "`nAttempting manual WiX build from generated sources..." -ForegroundColor Yellow
         
-        # Add signing arguments to jpackage
-        $jpackageArgs += "--win-package-signing-prefix", "io.github.brunoborges"
-        
-        # Note: jpackage will automatically find and use the certificate from the store
-    } catch {
-        Write-Host "⚠️  Certificate import failed: $($_.Exception.Message)" -ForegroundColor Yellow
-        Write-Host "Creating unsigned installer..." -ForegroundColor Yellow
-    } finally {
-        # Clean up temporary certificate file
-        if (Test-Path $certPath) {
-            Remove-Item $certPath -Force
-        }
-    }
-} else {
-    Write-Host "ℹ️  No signing certificate provided - creating unsigned package" -ForegroundColor Blue
-}
-
-# Execute jpackage
-Write-Host "🏗️  Running jpackage..." -ForegroundColor Yellow
-Write-Host "Command: jpackage $($jpackageArgs -join ' ')" -ForegroundColor Gray
-
-try {
-    & jpackage @jpackageArgs
-    
-    # Verify the package was created
-    $msiFile = Get-ChildItem -Path $installerPath -Filter "*.msi" | Select-Object -First 1
-    
-    if (-not $msiFile) {
-        Write-Host "❌ Error: No .msi file was created" -ForegroundColor Red
-        exit 1
-    }
-    
-    $msiSize = [math]::Round(($msiFile.Length / 1MB), 1)
-    Write-Host "✅ Installer package created: $($msiFile.FullName) (Size: $msiSize MB)" -ForegroundColor Green
-    
-} catch {
-    Write-Host "❌ Error during jpackage execution: $($_.Exception.Message)" -ForegroundColor Red
-    exit 1
-}
-
-# Step 4: Post-processing and verification
-Write-Host ""
-Write-Host "🔍 Final verification..." -ForegroundColor Yellow
-
-# Verify MSI package properties
-try {
-    $msiInfo = & msiexec /? 2>&1 | Out-Null  # Just check if msiexec is available
-    Write-Host "✅ MSI package appears valid" -ForegroundColor Green
-} catch {
-    Write-Host "⚠️  Could not verify MSI package" -ForegroundColor Yellow
-}
-
-# Check if package is signed (basic check)
-if ($signingCertificate) {
-    try {
-        $signature = Get-AuthenticodeSignature -FilePath $msiFile.FullName
-        if ($signature.Status -eq "Valid") {
-            Write-Host "✅ Package signature is valid" -ForegroundColor Green
+        # Find the wix command in the log
+        $LogContent = Get-Content "jpackage.log" -Raw
+        # Regex to find the wix.exe build command. It usually starts after "Command [PID: ...]:" and is indented.
+        # We look for "wix.exe build" and capture until the end of the line or next log entry.
+        if ($LogContent -match '(?ms)Command \[PID: \d+\]:\s+(wix\.exe build .*?)(?=\r?\n\[|\Z)') {
+            $WixCommand = $Matches[1] -replace "[\r\n]+", " " -replace "\s+", " "
+            
+            Write-Host "Found WiX command. Executing manually..." -ForegroundColor Cyan
+            # Write-Host $WixCommand -ForegroundColor DarkGray
+            
+            # Execute the command
+            # We need to invoke it using cmd /c or Invoke-Expression, but Invoke-Expression is dangerous with quotes.
+            # Better to start process.
+            # But the command string has arguments.
+            
+            # Let's try Invoke-Expression since we trust the source (jpackage output)
+            Invoke-Expression $WixCommand
+            
+            if ($LASTEXITCODE -eq 0) {
+                Write-Host "Manual WiX build succeeded!" -ForegroundColor Green
+                
+                # Find the generated MSI
+                $GeneratedMsi = Get-ChildItem -Path "$WixTempDir/wixobj" -Filter "*.msi" | Select-Object -First 1
+                if ($GeneratedMsi) {
+                    $DestMsi = Join-Path $InstallerOutput "$AppName-$AppVersion.msi"
+                    Move-Item $GeneratedMsi.FullName $DestMsi -Force
+                    Write-Host "Moved MSI to: $DestMsi" -ForegroundColor Green
+                    
+                    Write-Host "`n=== SUCCESS (Manual Recovery) ===" -ForegroundColor Green
+                    Get-ChildItem $InstallerOutput
+                    exit 0
+                } else {
+                    Write-Error "MSI file not found in wixobj after successful build."
+                }
+            } else {
+                Write-Error "Manual WiX build failed."
+            }
         } else {
-            Write-Host "⚠️  Package signature verification failed: $($signature.StatusMessage)" -ForegroundColor Yellow
+            Write-Warning "Could not find wix.exe build command in jpackage output."
         }
-    } catch {
-        Write-Host "⚠️  Could not verify package signature: $($_.Exception.Message)" -ForegroundColor Yellow
     }
+    exit 1 
 }
 
-# Show final summary
-Write-Host ""
-Write-Host "🎉 Build Summary" -ForegroundColor Cyan
-Write-Host "=================" -ForegroundColor Cyan
-Write-Host "📦 Package: $($msiFile.FullName)" -ForegroundColor White
-Write-Host "📏 Size: $msiSize MB" -ForegroundColor White
-Write-Host "🔧 Custom JRE: $([math]::Round($jreSize, 1)) MB" -ForegroundColor White
-Write-Host "🔐 Signed: $(if ($signingCertificate) { "Yes" } else { "No" })" -ForegroundColor White
-
-Write-Host ""
-Write-Host "✅ Windows installer build completed successfully!" -ForegroundColor Green
-Write-Host ""
-Write-Host "📋 Installation Instructions:" -ForegroundColor Yellow
-Write-Host "   1. Double-click the .msi file to install" -ForegroundColor White
-Write-Host "   2. The application will be installed to Program Files" -ForegroundColor White
-Write-Host "   3. A desktop shortcut and start menu entry will be created" -ForegroundColor White
-Write-Host "   4. The application will start automatically and appear in your system tray" -ForegroundColor White
-Write-Host ""
-Write-Host "🗑️  Uninstallation:" -ForegroundColor Yellow
-Write-Host "   Use Add/Remove Programs or run: msiexec /x `"$($msiFile.Name)`"" -ForegroundColor White
+Write-Host "`n=== SUCCESS ===" -ForegroundColor Green
+Write-Host "Installer created at: $InstallerOutput" -ForegroundColor Cyan
+Get-ChildItem $InstallerOutput
