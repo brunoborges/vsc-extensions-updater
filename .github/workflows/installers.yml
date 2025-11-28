@@ -1,0 +1,136 @@
+name: Installers
+
+on:
+  push:
+    branches: [ "main" ]
+    tags: [ "v*" ]
+  pull_request:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+jobs:
+  linux-installer:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up JDK 21
+      uses: actions/setup-java@v4
+      with:
+        java-version: '21'
+        distribution: 'temurin'
+        cache: maven
+
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y fakeroot dpkg
+
+    - name: Build Linux Installer
+      run: |
+        chmod +x installers/linux/build.sh
+        ./installers/linux/build.sh
+
+    - name: Upload Linux Installer
+      uses: actions/upload-artifact@v4
+      with:
+        name: linux-installer
+        path: target/installer/*.deb
+
+    - name: Release
+      if: startsWith(github.ref, 'refs/tags/')
+      uses: softprops/action-gh-release@v2
+      with:
+        files: target/installer/*.deb
+
+  macos-installer:
+    runs-on: macos-latest
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up JDK 21
+      uses: actions/setup-java@v4
+      with:
+        java-version: '21'
+        distribution: 'temurin'
+        cache: maven
+
+    - name: Import signing certificates
+      if: startsWith(github.ref, 'refs/tags/')
+      env:
+        SIGNING_CERTIFICATE_P12_DATA: ${{ secrets.SIGNING_CERTIFICATE_P12_DATA }}
+        SIGNING_CERTIFICATE_PASSWORD: ${{ secrets.SIGNING_CERTIFICATE_PASSWORD }}
+      run: |
+        if [ -n "$SIGNING_CERTIFICATE_P12_DATA" ]; then
+          echo $SIGNING_CERTIFICATE_P12_DATA | base64 --decode > certificate.p12
+          security create-keychain -p temp_password temp.keychain
+          security default-keychain -s temp.keychain
+          security unlock-keychain -p temp_password temp.keychain
+          security import certificate.p12 -k temp.keychain -P $SIGNING_CERTIFICATE_PASSWORD -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k temp_password temp.keychain
+        fi
+
+    - name: Set up notarization credentials
+      if: startsWith(github.ref, 'refs/tags/')
+      env:
+        NOTARIZATION_USERNAME: ${{ secrets.NOTARIZATION_USERNAME }}
+        NOTARIZATION_PASSWORD: ${{ secrets.NOTARIZATION_PASSWORD }}
+        NOTARIZATION_TEAM_ID: ${{ secrets.NOTARIZATION_TEAM_ID }}
+      run: |
+        if [ -n "$NOTARIZATION_USERNAME" ]; then
+          xcrun notarytool store-credentials "vscode-updater-notarization" \
+            --apple-id "$NOTARIZATION_USERNAME" \
+            --password "$NOTARIZATION_PASSWORD" \
+            --team-id "$NOTARIZATION_TEAM_ID"
+        fi
+
+    - name: Build macOS Installer
+      run: |
+        chmod +x installers/macos/build.sh
+        ./installers/macos/build.sh
+      env:
+        MAC_SIGNING_IDENTITY: ${{ secrets.MAC_SIGNING_IDENTITY }}
+        MAC_NOTARIZATION_PROFILE: "vscode-updater-notarization"
+
+    - name: Upload macOS Installer
+      uses: actions/upload-artifact@v4
+      with:
+        name: macos-installer
+        path: target/installer/*.pkg
+
+    - name: Release
+      if: startsWith(github.ref, 'refs/tags/')
+      uses: softprops/action-gh-release@v2
+      with:
+        files: target/installer/*.pkg
+
+  windows-installer:
+    runs-on: windows-latest
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up JDK 21
+      uses: actions/setup-java@v4
+      with:
+        java-version: '21'
+        distribution: 'temurin'
+        cache: maven
+
+    - name: Build Windows Installer
+      run: |
+        .\installers\windows\build.ps1
+      env:
+        WIN_SIGNING_CERTIFICATE: ${{ secrets.WIN_SIGNING_CERTIFICATE }}
+        WIN_SIGNING_PASSWORD: ${{ secrets.WIN_SIGNING_PASSWORD }}
+
+    - name: Upload Windows Installer
+      uses: actions/upload-artifact@v4
+      with:
+        name: windows-installer
+        path: target/installer/*.msi
+
+    - name: Release
+      if: startsWith(github.ref, 'refs/tags/')
+      uses: softprops/action-gh-release@v2
+      with:
+        files: target/installer/*.msi

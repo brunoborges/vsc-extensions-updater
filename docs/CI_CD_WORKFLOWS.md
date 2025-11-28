@@ -113,21 +113,47 @@ The CI workflow uses a matrix strategy to ensure compatibility:
    - OWASP dependency check report
    - Dependency analysis results
 
-## 🍎 macOS Installer Workflow
+## 📦 Cross-Platform Installer Workflow
 
-### Workflow: `macos-installer.yml`
+### Workflow: `installers.yml`
 **Triggers**:
 - Tagged releases (`v*`)
 - Manual trigger
-- Pull requests affecting macOS installer files
+- Pull requests to `main` branch
 
-**Purpose**: Builds signed macOS installer packages with embedded Java Runtime
+**Purpose**: Builds native installer packages for Linux, macOS, and Windows with embedded Java Runtime.
 
-**Key Features**:
-- Creates self-contained `.pkg` installers
-- Embeds custom JRE using `jlink`
-- Supports code signing and notarization
-- Generates universal binaries for Intel and Apple Silicon
+**Jobs**:
+
+#### 1. **Linux Installer** (`linux-installer`)
+- **Platform**: Ubuntu
+- **Output**: `.deb` package
+- **Features**:
+  - Embeds custom JRE
+  - Creates Debian package with `jpackage`
+  - Includes desktop integration
+
+#### 2. **macOS Installer** (`macos-installer`)
+- **Platform**: macOS
+- **Output**: `.pkg` installer
+- **Features**:
+  - Embeds custom JRE
+  - Supports code signing and notarization
+  - Creates signed package for distribution
+
+#### 3. **Windows Installer** (`windows-installer`)
+- **Platform**: Windows
+- **Output**: `.msi` installer
+- **Features**:
+  - Embeds custom JRE
+  - Creates MSI package with `jpackage`
+  - Supports code signing (if configured)
+
+### Release Process
+When a tag (e.g., `v1.0.0`) is pushed:
+1. All three jobs run in parallel.
+2. Installers are built and signed (where applicable).
+3. Artifacts are uploaded to the GitHub Release automatically.
 
 ## 📊 Build Status
 
